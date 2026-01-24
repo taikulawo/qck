@@ -1,10 +1,9 @@
-use rquickjs::Null;
 use rquickjs::atom::PredefinedAtom;
 use rquickjs::class::Trace;
-use rquickjs::{Ctx, FromIteratorJs, IntoAtom, IntoJs, Object, Value};
+use rquickjs::{Ctx, FromIteratorJs, Null, Object, Value};
 use rquickjs::{JsLifetime, Result};
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex, MutexGuard};
+
+use crate::ffi::SharedMap;
 
 #[derive(Trace, JsLifetime, Debug)]
 #[rquickjs::class]
@@ -59,23 +58,5 @@ impl Request {
             return Ok(rquickjs::Object::from_iter_js(&ctx, &*self.headers.lock())?.into_value());
         }
         Ok(Null.into_value(ctx))
-    }
-}
-#[derive(Default, Clone, Debug)]
-pub struct SharedMap<T, S>(pub(crate) Arc<Mutex<HashMap<T, S>>>);
-impl<T, S> SharedMap<T, S> {
-    fn lock(&self) -> MutexGuard<'_, HashMap<T, S>> {
-        self.0.lock().unwrap()
-    }
-}
-impl<'js, K, V> IntoJs<'js> for SharedMap<K, V>
-where
-    K: IntoAtom<'js>,
-    V: IntoJs<'js>,
-{
-    fn into_js(self, _ctx: &Ctx<'js>) -> Result<Value<'js>> {
-        unimplemented!(
-            "On javascript side, SharedMap should only be modified by function, not access directly."
-        );
     }
 }

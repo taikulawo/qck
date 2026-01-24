@@ -1,5 +1,5 @@
 use criterion::{Criterion, criterion_group, criterion_main};
-use qck::{run_in, setup::setup_hook};
+use qck::{ffi::setup_hook, run_in};
 use rquickjs::{AsyncContext, AsyncRuntime};
 use std::hint::black_box;
 
