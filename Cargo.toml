@@ -1,0 +1,9 @@
+[package]
+name = "qck"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+futures-util = "0.3.31"
+rquickjs = { version = "0.11.0", features = ["futures", "std", "macro"] }
+tokio = { version = "1.49.0", features = ["full"] }
