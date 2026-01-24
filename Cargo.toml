@@ -4,6 +4,17 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+rquickjs = { git = "https://github.com/DelSkayn/rquickjs.git", branch = "master", version = "0.11.0", features = [
+    "futures",
+    "std",
+    "macro",
+] }
 futures-util = "0.3.31"
-rquickjs = { version = "0.11.0", features = ["futures", "std", "macro"] }
 tokio = { version = "1.49.0", features = ["full"] }
+
+[dev-dependencies]
+criterion = { version = "0.8.1", features = ["html_reports", "async_tokio"] }
+[[bench]]
+name = "ctx"
+harness = false
+path = "./benches/ctx.rs"

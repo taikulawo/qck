@@ -1,4 +1,5 @@
 use futures_util::{future::join_all, stream::FuturesUnordered};
+use qck::run_in;
 use rquickjs::{AsyncContext, AsyncRuntime};
 use tokio::task::LocalSet;
 mod ffi;
@@ -19,10 +20,8 @@ async fn main() {
                 let context = AsyncContext::full(&rt).await.unwrap();
                 setup::setup_hook(&context).await;
                 let ctx = context.clone();
-                let task1 =
-                    tokio::task::spawn_local(async move { setup::run_js_func(ctx).await });
+                let task1 = tokio::task::spawn_local(async move { run_in(ctx).await });
                 futs.push(task1);
-                setup::run_on_request(context).await;
             }
             let result = join_all(futs).await;
             for res in result {

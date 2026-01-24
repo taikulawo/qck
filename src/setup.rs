@@ -2,14 +2,14 @@ use rquickjs::function::Args;
 use rquickjs::{
     AsyncContext, CatchResultExt, Exception, Function, Promise, Result, promise::Promised,
 };
-use rquickjs::{Class, IntoJs};
+use rquickjs::{Class, Error, IntoJs};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use crate::ffi;
 use crate::req::{Request, SharedMap};
-pub(crate) async fn run_js_func(context: AsyncContext) {
+pub async fn run_js_func(context: AsyncContext) {
     context
         .async_with(async |ctx| {
             let ctx_clone = ctx.clone();
@@ -21,16 +21,24 @@ pub(crate) async fn run_js_func(context: AsyncContext) {
             // call js function
             let foo: Function = global.get("foo").unwrap();
 
-            foo.call::<_, Promise>((promised,))
+            match foo
+                .call::<_, Promise>((promised,))
                 .unwrap()
                 .into_future::<()>()
                 .await
-                .unwrap()
+            {
+                Err(Error::Exception) => {
+                    let e = ctx.catch();
+                    panic!("{:?}", e);
+                }
+                Err(err) => panic!("{:?}", err),
+                _ => {}
+            }
         })
         .await
 }
 
-pub(crate) async fn run_on_request(context: AsyncContext) {
+pub async fn run_on_request(context: AsyncContext) {
     context
         .async_with(async |ctx| {
             let global = ctx.globals();
@@ -53,11 +61,12 @@ pub(crate) async fn run_on_request(context: AsyncContext) {
                 .await
                 .unwrap();
             // get final map
-            println!("from rust side, {:?}", map.0.lock())
+            assert!(map.0.lock().unwrap().get("from_js_side").is_some());
+            assert!(map.0.lock().unwrap().get("from_rust_side").is_some());
         })
         .await
 }
-pub(crate) async fn setup_hook(context: &AsyncContext) {
+pub async fn setup_hook(context: &AsyncContext) {
     context
         .async_with(async |ctx| {
             let global = ctx.globals();
@@ -73,18 +82,15 @@ pub(crate) async fn setup_hook(context: &AsyncContext) {
             let _f = ctx
                 .eval::<Function, _>(
                     r"
-                    let a = 1;
                 globalThis.foo = async function (v){
                     try{
                         await v;
                     }catch(e) {
                         if (e.message !== 'some_message'){
                             throw new Error('wrong error')
-                            }
+                        }
                         // call rust function
                         console.log(`call foo`)
-                        a += 1;
-                        console.log(`aaa`, a)
                         return
                     }
                     throw new Error('no error thrown')
@@ -102,11 +108,11 @@ pub(crate) async fn setup_hook(context: &AsyncContext) {
                 .unwrap();
             ctx.eval::<(), _>(
                 r#"
-            globalThis.console = {
-            log(...v) {
-                globalThis.__print(`${v.join(" ")}`)
-            }
-            }
+                globalThis.console = {
+                    log(...v) {
+                        globalThis.__print(`${v.join(" ")}`)
+                    }
+                }
             "#,
             )
             .unwrap();
