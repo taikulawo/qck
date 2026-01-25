@@ -1,8 +1,14 @@
-use rquickjs::AsyncContext;
+use rquickjs::{Ctx, Error};
 
 pub mod ffi;
 pub mod req;
-pub async fn run_in(ctx: AsyncContext) {
-    ffi::run_js_func(ctx.clone()).await;
-    ffi::run_on_request(ctx).await;
+
+pub fn handle_js_err(ctx: &Ctx<'_>, err: Error) {
+    match err {
+        Error::Exception => {
+            let e = ctx.catch();
+            panic!("{:?}", e);
+        }
+        err => panic!("{:?}", err),
+    }
 }
