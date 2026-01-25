@@ -32,12 +32,15 @@ pub async fn call_js_and_call_rust_from_js_cb(context: AsyncContext) {
 }
 
 pub const SETUP_CODE: &str = r#"
+import * as os from 'os';
+
     (function(){globalThis.console = {
         log(...v) {
             globalThis.__ffi_print(`${v.join(" ")}`)
         }
     }
     globalThis.foo = async function (v){
+        console.log(os.setTimeout)
         try{
             await v;
         }catch(e) {

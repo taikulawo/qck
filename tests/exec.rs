@@ -4,10 +4,14 @@ use futures_util::{FutureExt, future::join_all, stream::FuturesUnordered};
 mod common;
 use common::run_test_code;
 use qck::ffi;
-use rquickjs::{AsyncContext, AsyncRuntime};
+use rquickjs::{AsyncContext, AsyncRuntime, loader::ModuleLoader};
+use rquickjs_extra::os::OsModule;
 
 use crate::common::SETUP_CODE;
 async fn run(rt: &AsyncRuntime) {
+    // TODO 加载平台API
+    // let loader = (ModuleLoader::default().with_module("os", OsModule),);
+
     // JSContext represents a Javascript context (or Realm). Each JSContext has its own global objects and system objects.
     // There can be several JSContexts per JSRuntime and they can share objects,
     // similar to frames of the same origin sharing Javascript objects in a web browser.

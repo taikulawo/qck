@@ -8,9 +8,11 @@ rquickjs = { git = "https://github.com/DelSkayn/rquickjs.git", branch = "master"
     "futures",
     "std",
     "macro",
+    "loader"
 ] }
 futures-util = "0.3.31"
 tokio = { version = "1.49.0", features = ["full"] }
+rquickjs-extra = "0.2.1"
 
 [dev-dependencies]
 criterion = { version = "0.8.1", features = ["html_reports", "async_tokio"] }
