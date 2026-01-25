@@ -4,8 +4,7 @@ use futures_util::{FutureExt, future::join_all, stream::FuturesUnordered};
 mod common;
 use common::run_test_code;
 use qck::ffi;
-use rquickjs::{AsyncContext, AsyncRuntime, loader::ModuleLoader};
-use rquickjs_extra::os::OsModule;
+use rquickjs::{AsyncContext, AsyncRuntime};
 
 use crate::common::SETUP_CODE;
 async fn run(rt: &AsyncRuntime) {

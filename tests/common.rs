@@ -32,7 +32,7 @@ pub async fn call_js_and_call_rust_from_js_cb(context: AsyncContext) {
 }
 
 pub const SETUP_CODE: &str = r#"
-import * as os from 'os';
+    // import * as os from 'os';
 
     (function(){globalThis.console = {
         log(...v) {
@@ -40,7 +40,6 @@ import * as os from 'os';
         }
     }
     globalThis.foo = async function (v){
-        console.log(os.setTimeout)
         try{
             await v;
         }catch(e) {
