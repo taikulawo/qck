@@ -1,16 +1,9 @@
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-
 use rquickjs::atom::PredefinedAtom;
 use rquickjs::class::Trace;
-use rquickjs::function::Args;
-use rquickjs::{
-    AsyncContext, Class, Ctx, FromIteratorJs, Function, IntoJs, Null, Object, Promise, Value,
-};
+use rquickjs::{Ctx, FromIteratorJs, Null, Object, Value};
 use rquickjs::{JsLifetime, Result};
 
 use crate::ffi::SharedMap;
-use crate::handle_js_err;
 
 #[derive(Trace, JsLifetime, Debug)]
 #[rquickjs::class]
@@ -66,35 +59,4 @@ impl Request {
         }
         Ok(Null.into_value(ctx))
     }
-}
-pub async fn run_on_request(context: AsyncContext) {
-    context
-        .async_with(async |ctx| {
-            let global = ctx.globals();
-            let on_req: Function = global.get("onRequest").unwrap();
-
-            let mut m = HashMap::new();
-            m.insert("from_rust_side".to_string(), "yes".to_string());
-
-            let map = SharedMap::new(Arc::new(Mutex::new(m)));
-            let req = Class::instance(ctx.clone(), Request::new_rust(map.clone())).unwrap();
-            let mut args = Args::new(ctx.clone(), 1);
-            let value = req.into_js(&ctx).unwrap();
-            args.push_arg(value).unwrap();
-
-            // call js function with rust struct
-            match on_req
-                .call_arg::<Promise>(args)
-                .unwrap()
-                .into_future::<()>()
-                .await
-            {
-                Err(err) => handle_js_err(&ctx, err),
-                _ => {}
-            }
-            // get final map
-            assert!(map.lock().get("from_js_side").is_some());
-            assert!(map.lock().get("from_rust_side").is_some());
-        })
-        .await
 }

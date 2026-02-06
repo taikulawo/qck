@@ -1,22 +1,25 @@
 use std::time::Instant;
 
 use criterion::{Criterion, criterion_group, criterion_main};
-use qck::ffi::setup_runtime_context;
+use qck::JsEngine;
 use rquickjs::{AsyncContext, AsyncRuntime};
 use tokio::task::LocalSet;
 
-use crate::common::{SETUP_CODE, run_test_code};
+use crate::common::{SETUP_CODE, run_test_code, run_test_code_in_context};
 #[path = "../tests/common.rs"]
 mod common;
 // 结论：
 // AsyncRuntime单次创建 10us
 // AsyncContext 单次创建 150us
 // 但总体 150微妙 可接受
-async fn setup() -> (AsyncRuntime, AsyncContext) {
-    let js_rt = AsyncRuntime::new().unwrap();
-    let context = AsyncContext::full(&js_rt).await.unwrap();
-    setup_runtime_context(&context, SETUP_CODE).await;
-    (js_rt, context)
+async fn setup() -> (JsEngine, AsyncContext) {
+    let engine = JsEngine::new().await.unwrap();
+    let context = engine.new_context().await;
+    engine
+        .eval_in_context::<()>(&context, SETUP_CODE)
+        .await
+        .unwrap();
+    (engine, context)
 }
 fn bench_js_call(c: &mut Criterion) {
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -27,11 +30,10 @@ fn bench_js_call(c: &mut Criterion) {
     {
         c.bench_function("use same context", |b| {
             b.to_async(&rt).iter_custom(|iter| async move {
-                let (_, context) = setup().await;
-
+                let (rt, context) = setup().await;
                 let start = Instant::now();
                 for _ in 0..iter {
-                    run_test_code(context.clone()).await;
+                    run_test_code_in_context(&rt, &context).await.unwrap();
                 }
                 start.elapsed()
             })
@@ -40,25 +42,22 @@ fn bench_js_call(c: &mut Criterion) {
     {
         c.bench_function("use same context and parallel run task", |b| {
             b.to_async(&rt).iter_custom(|iter| async move {
-                let (_, context) = setup().await;
+                let (rt, context) = setup().await;
 
                 let local = LocalSet::new();
                 let start = Instant::now();
                 for _ in 0..iter {
-                    run_test_code(context.clone()).await;
+                    run_test_code_in_context(&rt, &context).await.unwrap();
                 }
                 local.await;
                 start.elapsed()
             })
         });
     }
-    async fn run_in_new_context(rt: &AsyncRuntime) {
-        let context = AsyncContext::full(&rt).await.unwrap();
-        setup_runtime_context(&context, SETUP_CODE).await;
-
-        run_test_code(context.clone()).await;
+    async fn run_in_new_context(rt: &JsEngine) {
+        run_test_code(rt).await.unwrap();
     }
-    c.bench_function("use separate context", |b| {
+    c.bench_function("use separate context run test code", |b| {
         b.to_async(&rt).iter_custom(|iter| async move {
             let start = Instant::now();
             let (rt, _) = setup().await;
@@ -72,9 +71,9 @@ fn bench_js_call(c: &mut Criterion) {
         b.to_async(&rt).iter_custom(|iter| async move {
             let local = LocalSet::new();
             let start = Instant::now();
-            let (js_rt, _) = setup().await;
+            let rt = setup().await;
             for _ in 0..iter {
-                let rt = js_rt.clone();
+                let (rt, _) = rt.clone();
                 local.spawn_local(async move {
                     run_in_new_context(&rt).await;
                 });

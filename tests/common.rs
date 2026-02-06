@@ -1,38 +1,44 @@
-use qck::{handle_js_err, req};
-use rquickjs::{AsyncContext, Exception, Function, Promise, Result, promise::Promised};
+use qck::{ErrorMessage, JsEngine};
+use rquickjs::{AsyncContext, Ctx, Error, Exception, Function, function::Args, promise::Promised};
 
-pub async fn run_test_code(ctx: AsyncContext) {
-    call_js_and_call_rust_from_js_cb(ctx.clone()).await;
-    req::run_on_request(ctx).await;
+pub async fn run_test_code(rt: &JsEngine) -> Result<(), ErrorMessage> {
+    let context = rt.new_context().await;
+    run_test_code_in_context(rt, &context).await
 }
-
-pub async fn call_js_and_call_rust_from_js_cb(context: AsyncContext) {
-    context
-        .async_with(async |ctx| {
-            let ctx_clone = ctx.clone();
-            let global = ctx.globals();
-            let promised = Promised::from(async move {
-                // tokio::time::sleep(Duration::from_millis(100)).await;
-                Result::<()>::Err(Exception::throw_message(&ctx_clone, "some_message"))
-            });
-            // call js function
-            let foo: Function = global.get("foo").unwrap();
-
-            match foo
-                .call::<_, Promise>((promised,))
-                .unwrap()
-                .into_future::<()>()
-                .await
-            {
-                Err(err) => handle_js_err(&ctx, err),
-                _ => {}
-            }
-        })
+pub async fn run_test_code_in_context(
+    rt: &JsEngine,
+    context: &AsyncContext,
+) -> Result<(), ErrorMessage> {
+    rt.eval_in_context::<()>(&context, SETUP_CODE)
         .await
+        .unwrap();
+    call_js_and_call_rust_from_js_cb(&context, rt).await?;
+    rt.run_on_request::<()>(&context).await
+}
+pub async fn call_js_and_call_rust_from_js_cb(
+    context: &AsyncContext,
+    rt: &JsEngine,
+) -> Result<(), ErrorMessage> {
+    rt.run_in_context(&context, async |ctx: Ctx<'_>| {
+        let ctx_clone = ctx.clone();
+        let global = ctx.globals();
+        let promised = Promised::from(async move {
+            // tokio::time::sleep(Duration::from_millis(100)).await;
+            Result::<(), Error>::Err(Exception::throw_message(&ctx_clone, "some_message"))
+        });
+        // call js function
+        let foo: Function = global.get("foo").unwrap();
+        let mut args = Args::new(ctx.clone(), 1);
+        args.push_arg(promised).unwrap();
+        rt.call_code_args::<()>(&foo, args).await
+    })
+    .await
 }
 
+#[allow(unused)]
 pub const SETUP_CODE: &str = r#"
-    // import * as os from 'os';
+    //  import { type } from 'os';
+
 
     (function(){globalThis.console = {
         log(...v) {

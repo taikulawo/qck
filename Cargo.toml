@@ -4,15 +4,17 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-rquickjs = { git = "https://github.com/DelSkayn/rquickjs.git", branch = "master", version = "0.11.0", features = [
+rquickjs = { version = "0.11.0", features = [
     "futures",
     "std",
     "macro",
-    "loader"
+    "loader",
 ] }
 futures-util = "0.3.31"
 tokio = { version = "1.49.0", features = ["full"] }
 rquickjs-extra = "0.2.1"
+rquickjs-serde = "0.4.0"
+serde = "1.0.228"
 
 [dev-dependencies]
 criterion = { version = "0.8.1", features = ["html_reports", "async_tokio"] }

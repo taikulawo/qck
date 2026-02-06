@@ -1,9 +1,9 @@
-use crate::{ffi, handle_js_err};
-use rquickjs::{AsyncContext, Function, Result, Undefined};
+use crate::ffi;
 use rquickjs::{Ctx, IntoAtom, IntoJs, Value};
+use rquickjs::{Function, Result};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
-fn register_ffi(ctx: &Ctx<'_>) {
+pub(crate) fn register_ffi(ctx: &Ctx<'_>) {
     let global = ctx.globals();
     global
         .set(
@@ -15,18 +15,6 @@ fn register_ffi(ctx: &Ctx<'_>) {
         )
         .unwrap();
 }
-pub async fn setup_runtime_context(context: &AsyncContext, code: &str) {
-    context
-        .async_with(async |ctx| {
-            register_ffi(&ctx);
-            match ctx.eval::<Undefined, _>(code) {
-                Err(err) => handle_js_err(&ctx, err),
-                _ => {}
-            }
-        })
-        .await;
-}
-
 fn ffi_print(s: String) {
     println!("{s}");
 }
