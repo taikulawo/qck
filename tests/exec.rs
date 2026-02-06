@@ -2,15 +2,17 @@ use std::time::SystemTime;
 
 use futures_util::{FutureExt, future::join_all, stream::FuturesUnordered};
 mod common;
-use common::run_test_code;
 use qck::JsEngine;
 
-use crate::common::SETUP_CODE;
+use crate::common::{SETUP_CODE, run_test_code_in_context};
 async fn run() {
     let rt = JsEngine::new().await.unwrap();
     let now = SystemTime::now();
-    rt.eval_in_new_context::<()>(SETUP_CODE).await.unwrap();
-    run_test_code(&rt).await.unwrap();
+    let context = rt.new_context().await;
+    rt.run_module_in_context::<()>(&context, SETUP_CODE)
+        .await
+        .unwrap();
+    run_test_code_in_context(&rt, &context).await.unwrap();
     let after = SystemTime::now();
     println!(
         "time elapsed {} us",

@@ -5,7 +5,8 @@ use std::{
 };
 
 use rquickjs::{
-    AsyncContext, AsyncRuntime, Class, Ctx, Error, Function, IntoJs, Promise, Value, async_with,
+    AsyncContext, AsyncRuntime, Class, Ctx, Error, Function, IntoJs, Module, Promise, Value,
+    async_with,
     function::Args,
     loader::{BuiltinResolver, ModuleLoader},
 };
@@ -47,17 +48,10 @@ impl JsEngine {
         let resolver = BuiltinResolver::default().with_module("os");
         let loader = (ModuleLoader::default().with_module("os", OsModule),);
         rt.set_loader(resolver, loader).await;
-
         let me = Self { rt: rt };
-        me.register_global().await;
         Ok(me)
     }
-    async fn register_global(&self) {
-        // JSContext represents a Javascript context (or Realm). Each JSContext has its own global objects and system objects.
-        // There can be several JSContexts per JSRuntime and they can share objects,
-        // similar to frames of the same origin sharing Javascript objects in a web browser.
-        let context = AsyncContext::full(&self.rt).await.unwrap();
-
+    async fn register_global(&self, context: &AsyncContext) {
         async_with!(context => |ctx| {
             ffi::register_ffi(&ctx);
         })
@@ -102,7 +96,19 @@ impl JsEngine {
         try_handle_error!(context, r)
     }
     pub async fn new_context(&self) -> AsyncContext {
-        AsyncContext::full(&self.rt).await.unwrap()
+        // JSContext represents a Javascript context (or Realm). Each JSContext has its own global objects and system objects.
+        // There can be several JSContexts per JSRuntime and they can share objects,
+        // similar to frames of the same origin sharing Javascript objects in a web browser.
+        let ctx = AsyncContext::full(&self.rt).await.unwrap();
+        self.register_global(&ctx).await;
+        self.run_in_context(&ctx, async |ctx: Ctx<'_>| {
+            let (_, module_eval) = Module::evaluate_def::<OsModule, _>(ctx, "os")?;
+            module_eval.into_future::<()>().await?;
+            Ok(())
+        })
+        .await
+        .unwrap();
+        ctx
     }
     pub async fn call_code_args<'js, T: DeserializeOwned + 'static>(
         &self,
@@ -117,6 +123,22 @@ impl JsEngine {
             Error::new_from_js_message(from_type_name, to_type_name, err.to_string())
         })
     }
+    /// source must be esm
+    pub async fn run_module_in_context<'js, T: DeserializeOwned + 'static>(
+        &self,
+        context: &AsyncContext,
+        source: &str,
+    ) -> Result<T, ErrorMessage> {
+        let r = async_with!(context => |ctx| {
+                let v = Module::evaluate(ctx,"vm",source)?.into_future::<Value>().await?;
+                let from_type_name = v.type_name();
+                let to_type_name = type_name::<T>();
+                rquickjs_serde::from_value::<T>(v).map_err(|err|Error::new_from_js_message(from_type_name, to_type_name, err.to_string()))
+        })
+        .await;
+        try_handle_error!(context, r)
+    }
+    /// run script source
     pub async fn eval_in_context<'js, T: DeserializeOwned + 'static>(
         &self,
         context: &AsyncContext,
@@ -133,13 +155,6 @@ impl JsEngine {
         })
         .await;
         try_handle_error!(context, r)
-    }
-    pub async fn eval_in_new_context<'js, T: DeserializeOwned + 'static>(
-        &self,
-        source: &str,
-    ) -> Result<T, ErrorMessage> {
-        let context = AsyncContext::full(&self.rt).await?;
-        self.eval_in_context(&context, source).await
     }
 }
 fn handle_js_err(ctx: &Ctx<'_>, err: Error) -> ErrorMessage {

@@ -16,7 +16,7 @@ async fn setup() -> (JsEngine, AsyncContext) {
     let engine = JsEngine::new().await.unwrap();
     let context = engine.new_context().await;
     engine
-        .eval_in_context::<()>(&context, SETUP_CODE)
+        .run_module_in_context::<()>(&context, SETUP_CODE)
         .await
         .unwrap();
     (engine, context)

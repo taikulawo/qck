@@ -1,17 +1,17 @@
 use qck::{ErrorMessage, JsEngine};
 use rquickjs::{AsyncContext, Ctx, Error, Exception, Function, function::Args, promise::Promised};
-
+#[allow(unused)]
 pub async fn run_test_code(rt: &JsEngine) -> Result<(), ErrorMessage> {
     let context = rt.new_context().await;
+    rt.run_module_in_context::<()>(&context, SETUP_CODE)
+        .await
+        .unwrap();
     run_test_code_in_context(rt, &context).await
 }
 pub async fn run_test_code_in_context(
     rt: &JsEngine,
     context: &AsyncContext,
 ) -> Result<(), ErrorMessage> {
-    rt.eval_in_context::<()>(&context, SETUP_CODE)
-        .await
-        .unwrap();
     call_js_and_call_rust_from_js_cb(&context, rt).await?;
     rt.run_on_request::<()>(&context).await
 }
@@ -37,8 +37,7 @@ pub async fn call_js_and_call_rust_from_js_cb(
 
 #[allow(unused)]
 pub const SETUP_CODE: &str = r#"
-    //  import { type } from 'os';
-
+     import { type } from "os";
 
     (function(){globalThis.console = {
         log(...v) {
